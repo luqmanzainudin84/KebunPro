@@ -18,62 +18,86 @@
         }
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         .hidden { display: none; }
+        .swal2-popup { border-radius: 30px !important; background: #1e293b !important; color: white !important; }
     </style>
 </head>
 <body class="p-5">
 
     <div id="authSection" class="max-w-md mx-auto mt-20 space-y-6">
-        <h1 class="text-4xl font-black text-center text-green-400">KEBUN PRO</h1>
+        <h1 class="text-4xl font-black text-center text-green-400 tracking-tighter">KEBUN PRO</h1>
         <div class="bg-slate-800 p-8 rounded-[35px] shadow-2xl border border-slate-700">
-            <input id="email" type="email" placeholder="Emel" class="w-full p-4 mb-3 rounded-2xl bg-slate-900 border border-slate-700 text-white">
-            <input id="password" type="password" placeholder="Kata Laluan" class="w-full p-4 mb-6 rounded-2xl bg-slate-900 border border-slate-700 text-white">
-            <button onclick="handleAuth('login')" class="w-full bg-green-600 p-4 rounded-2xl font-bold mb-3">MASUK</button>
-            <button onclick="handleAuth('signup')" class="w-full bg-slate-700 p-4 rounded-2xl font-bold text-sm">DAFTAR AKAUN BARU</button>
+            <input id="email" type="email" placeholder="Emel" class="w-full p-4 mb-3 rounded-2xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-green-500">
+            <input id="password" type="password" placeholder="Kata Laluan" class="w-full p-4 mb-6 rounded-2xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-green-500">
+            <button onclick="handleAuth('login')" class="w-full bg-green-600 hover:bg-green-500 p-4 rounded-2xl font-bold mb-3 transition-all">MASUK</button>
+            <button onclick="handleAuth('signup')" class="w-full bg-slate-700 hover:bg-slate-600 p-4 rounded-2xl font-bold text-sm transition-all text-slate-300">DAFTAR AKAUN BARU</button>
         </div>
     </div>
 
     <div id="dashboardSection" class="max-w-md mx-auto hidden space-y-6">
-        <div class="flex justify-between items-center">
-            <h1 class="text-2xl font-black text-green-400">DASHBOARD</h1>
-            <button onclick="logout()" class="text-xs bg-red-900/30 text-red-400 px-4 py-2 rounded-full border border-red-900">LOGOUT</button>
+        <div class="flex justify-between items-center bg-slate-800/50 p-4 rounded-3xl border border-slate-700">
+            <div>
+                <p class="text-[10px] font-bold text-slate-400 uppercase">Akaun Peladang</p>
+                <h1 id="userLabel" class="text-sm font-black text-green-400">...</h1>
+            </div>
+            <button onclick="logout()" class="text-[10px] font-bold bg-red-900/20 text-red-400 px-4 py-2 rounded-xl border border-red-900/50">LOGOUT</button>
         </div>
 
-        <button onclick="bukaKiraCOGS()" class="w-full bg-blue-600 p-5 rounded-[25px] font-black uppercase tracking-widest shadow-lg border-b-4 border-blue-800">
+        <button onclick="bukaKiraCOGS()" class="w-full bg-blue-600 hover:bg-blue-500 p-5 rounded-[25px] font-black uppercase tracking-widest shadow-lg border-b-4 border-blue-800 active:scale-95 transition-all">
             📊 Kalkulator COGS
         </button>
 
-        <button onclick="bukaTambahProduk()" class="w-full bg-emerald-600 p-5 rounded-[25px] font-black uppercase tracking-widest shadow-lg">
+        <button onclick="bukaTambahProduk()" class="w-full bg-emerald-600 hover:bg-emerald-500 p-5 rounded-[25px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">
             + Tambah Produk
         </button>
 
-        <div id="produkContainer" class="space-y-3"></div>
+        <div id="produkContainer" class="space-y-3">
+            </div>
     </div>
 
     <script>
         const SUPABASE_URL = "https://gbjrvrdsmajwajnhsodt.supabase.co";
         const SUPABASE_KEY = "sb_publishable_fp0mnEYNTgc7QexmOP3njg_VK6W6832";
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        // Inisialisasi Supabase Client
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let currentUser = null;
 
-        // AUTH LOGIC
+        // 1. PENGURUSAN LOGIN/DAFTAR
         async function handleAuth(type) {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-            if (!email || !password) return alert("Isi emel & password");
+            
+            if (!email || !password) {
+                Swal.fire("Info", "Sila masukkan emel dan password", "info");
+                return;
+            }
 
-            const { data, error } = type === 'login' 
-                ? await supabase.auth.signInWithPassword({ email, password })
-                : await supabase.auth.signUp({ email, password });
+            Swal.fire({ title: 'Memproses...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
-            if (error) alert(error.message);
-            else checkUser();
+            try {
+                const { data, error } = type === 'login' 
+                    ? await _supabase.auth.signInWithPassword({ email, password })
+                    : await _supabase.auth.signUp({ email, password });
+
+                if (error) throw error;
+                
+                if (type === 'signup') {
+                    Swal.fire("Berjaya!", "Sila sahkan emel anda (inbox/spam) sebelum login.", "success");
+                } else {
+                    Swal.close();
+                    checkUser();
+                }
+            } catch (error) {
+                Swal.fire("Ralat", error.message, "error");
+            }
         }
 
         async function checkUser() {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { user } } = await _supabase.auth.getUser();
             if (user) {
                 currentUser = user;
+                document.getElementById('userLabel').innerText = user.email;
                 document.getElementById('authSection').classList.add('hidden');
                 document.getElementById('dashboardSection').classList.remove('hidden');
                 muatProduk();
@@ -81,21 +105,32 @@
         }
 
         async function logout() {
-            await supabase.auth.signOut();
+            await _supabase.auth.signOut();
             location.reload();
         }
 
-        // PRODUK LOGIC
+        // 2. PENGURUSAN PRODUK
         async function muatProduk() {
-            const { data, error } = await supabase.from('produk').select('*').eq('user_id', currentUser.id);
-            if (data) {
-                document.getElementById('produkContainer').innerHTML = data.map(p => `
-                    <div class="admin-card p-6 relative">
-                        <button onclick="padamProduk(${p.id})" class="absolute top-4 right-4 text-red-500">🗑</button>
-                        <h3 class="font-black text-xl uppercase">${p.nama_barang}</h3>
-                        <p class="text-green-400 font-black text-2xl">${p.stok_kg}kg <span class="text-slate-500 text-xs">/ RM${p.harga_kg}</span></p>
+            const { data, error } = await _supabase
+                .from('produk')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .order('id', { ascending: false });
+                
+            const container = document.getElementById('produkContainer');
+            if (data && data.length > 0) {
+                container.innerHTML = data.map(p => `
+                    <div class="admin-card p-6 relative animate-in fade-in duration-500">
+                        <button onclick="padamProduk(${p.id})" class="absolute top-4 right-4 text-red-500/50 hover:text-red-500 transition-colors text-xl">🗑</button>
+                        <h3 class="font-black text-xl uppercase text-slate-100">${p.nama_barang}</h3>
+                        <div class="flex items-end gap-2 mt-2">
+                            <span class="text-green-400 font-black text-3xl">${p.stok_kg}kg</span>
+                            <span class="text-slate-500 text-xs font-bold mb-1">/ RM${p.harga_kg}</span>
+                        </div>
                     </div>
                 `).join('');
+            } else {
+                container.innerHTML = `<div class="text-center py-10 text-slate-500 text-sm font-bold">BELUM ADA PRODUK</div>`;
             }
         }
 
@@ -103,62 +138,95 @@
             const { value: f } = await Swal.fire({
                 title: 'TAMBAH PRODUK',
                 html: `
-                    <input id="n" placeholder="Nama Barang" class="swal2-input">
-                    <input id="h" type="number" placeholder="Harga/kg" class="swal2-input">
-                    <input id="s" type="number" placeholder="Stok (kg)" class="swal2-input">
+                    <div class="space-y-3">
+                        <input id="n" placeholder="Nama Produk (Cth: Cili)" class="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 text-white">
+                        <input id="h" type="number" placeholder="Harga Jualan / kg (RM)" class="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 text-white">
+                        <input id="s" type="number" placeholder="Stok Semasa (kg)" class="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 text-white">
+                    </div>
                 `,
-                preConfirm: () => ({ 
-                    user_id: currentUser.id, 
-                    nama_barang: document.getElementById('n').value, 
-                    harga_kg: document.getElementById('h').value, 
-                    stok_kg: document.getElementById('s').value 
-                })
+                showCancelButton: true,
+                confirmButtonText: 'SIMPAN',
+                preConfirm: () => {
+                    const nama = document.getElementById('n').value;
+                    const harga = document.getElementById('h').value;
+                    const stok = document.getElementById('s').value;
+                    if(!nama || !harga || !stok) return Swal.showValidationMessage("Sila isi semua kotak");
+                    return { user_id: currentUser.id, nama_barang: nama, harga_kg: harga, stok_kg: stok };
+                }
             });
+
             if (f) {
-                await supabase.from('produk').insert([f]);
-                muatProduk();
+                const { error } = await _supabase.from('produk').insert([f]);
+                if (error) Swal.fire("Gagal", error.message, "error");
+                else muatProduk();
             }
         }
 
         async function padamProduk(id) {
-            if (confirm("Padam produk ini?")) {
-                await supabase.from('produk').delete().eq('id', id);
+            const { isConfirmed } = await Swal.fire({
+                title: 'Padam Produk?',
+                text: "Data ini tidak boleh dikembalikan.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                confirmButtonText: 'YA, PADAM'
+            });
+
+            if (isConfirmed) {
+                await _supabase.from('produk').delete().eq('id', id);
                 muatProduk();
             }
         }
 
-        // COGS LOGIC (REBUILT FOR SUPABASE)
+        // 3. KALKULATOR COGS
         function setupCogsInput(id) {
             const el = document.getElementById(id);
+            if(!el) return;
             el.addEventListener('focus', function() { if (this.value === "0.00" || this.value === "0") this.value = ""; });
             el.addEventListener('blur', function() { if (this.value === "") this.value = "0.00"; });
         }
 
         async function bukaKiraCOGS() {
-            const { value: f } = await Swal.fire({
-                title: 'COGS CALCULATOR',
+            const { value: res } = await Swal.fire({
+                title: 'KIRA COGS',
                 html: `
-                    <div class="text-left space-y-2 max-h-[60vh] overflow-y-auto p-2">
-                        <label class="text-[10px] font-bold text-slate-400 uppercase">A. Hasil Musim (kg)</label>
-                        <input id="hasil_kg" type="number" class="cogs-input" placeholder="0">
-                        <label class="text-[10px] font-bold text-slate-400 uppercase">B. Kos Operasi (RM)</label>
-                        <input id="kos_op" type="number" class="cogs-input" value="0.00">
-                        <label class="text-[10px] font-bold text-slate-400 uppercase">C. Kos Sistem/Aset (RM)</label>
-                        <input id="kos_sis" type="number" class="cogs-input" value="0.00">
+                    <div class="text-left space-y-3 max-h-[60vh] overflow-y-auto px-2">
+                        <div>
+                            <label class="text-[10px] font-black text-slate-500 uppercase">A. Hasil Musim (kg)</label>
+                            <input id="hasil_kg" type="number" class="cogs-input" placeholder="0">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-500 uppercase">B. Kos Habis Pakai (RM)</label>
+                            <input id="kos_habis" type="number" class="cogs-input" value="0.00">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-500 uppercase">C. Kos Sistem/Aset (RM)</label>
+                            <input id="kos_aset" type="number" class="cogs-input" value="0.00">
+                        </div>
                     </div>
                 `,
-                didOpen: () => { ['hasil_kg', 'kos_op', 'kos_sis'].forEach(setupCogsInput); },
+                didOpen: () => { ['hasil_kg', 'kos_habis', 'kos_aset'].forEach(setupCogsInput); },
+                confirmButtonText: 'KIRA SEKARANG',
                 preConfirm: () => {
                     const h = parseFloat(document.getElementById('hasil_kg').value) || 1;
-                    const op = parseFloat(document.getElementById('kos_op').value) || 0;
-                    const sis = parseFloat(document.getElementById('kos_sis').value) || 0;
-                    return (op + (sis/10)) / h; // Contoh formula ringkas
+                    const b = parseFloat(document.getElementById('kos_habis').value) || 0;
+                    const a = parseFloat(document.getElementById('kos_aset').value) || 0;
+                    // Formula: (Kos Habis Pakai + Susut Nilai 10%) / Hasil
+                    return (b + (a * 0.1)) / h;
                 }
             });
-            if (f) Swal.fire("Keputusan", `Kos Pengeluaran: RM ${f.toFixed(2)} / kg`);
+
+            if (res) {
+                Swal.fire({
+                    title: 'HASIL COGS',
+                    html: `<h2 class="text-4xl font-black text-green-400">RM ${res.toFixed(2)} <span class="text-sm text-white">/ kg</span></h2>`,
+                    icon: 'success'
+                });
+            }
         }
 
-        checkUser();
+        // Semak status login setiap kali page dilancarkan
+        window.onload = checkUser;
     </script>
 </body>
 </html>
