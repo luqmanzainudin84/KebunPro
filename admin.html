@@ -14,9 +14,7 @@
         .cogs-input { 
             background: #0f172a !important; border: 1px solid #334155 !important; color: #10b981 !important; 
             font-weight: bold; padding: 12px; border-radius: 12px; width: 100%; text-align: right; 
-            appearance: textfield; -webkit-appearance: none; margin: 0;
         }
-        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         .hidden { display: none; }
         .swal2-popup { border-radius: 30px !important; background: #1e293b !important; color: white !important; }
     </style>
@@ -34,21 +32,31 @@
     </div>
 
     <div id="dashboardSection" class="max-w-md mx-auto hidden space-y-6">
+        
         <div class="flex justify-between items-center bg-slate-800/50 p-4 rounded-3xl border border-slate-700">
             <div>
                 <p class="text-[10px] font-bold text-slate-400 uppercase">Akaun Peladang</p>
-                <h1 id="userLabel" class="text-sm font-black text-green-400">...</h1>
+                <h1 id="userLabel" class="text-sm font-black text-green-400 text-wrap break-all">...</h1>
             </div>
             <button onclick="logout()" class="text-[10px] font-bold bg-red-900/20 text-red-400 px-4 py-2 rounded-xl border border-red-900/50">LOGOUT</button>
         </div>
 
-        <button onclick="bukaKiraCOGS()" class="w-full bg-blue-600 hover:bg-blue-500 p-5 rounded-[25px] font-black uppercase tracking-widest shadow-lg border-b-4 border-blue-800 active:scale-95 transition-all">
-            📊 Kalkulator COGS
-        </button>
+        <div class="p-5 bg-slate-800 rounded-[30px] border border-slate-700 shadow-lg">
+            <p class="text-[10px] font-bold text-slate-400 uppercase mb-3 px-1">Link Kedai Anda</p>
+            <div class="flex gap-2">
+                <input id="storeLinkInput" readonly class="flex-1 bg-slate-900 p-3 rounded-xl text-[11px] text-green-400 border border-slate-700 outline-none" value="Menjana link...">
+                <button onclick="salinLink()" class="bg-green-600 hover:bg-green-500 text-[10px] font-black px-5 py-3 rounded-xl transition-all shadow-lg">SALIN</button>
+            </div>
+        </div>
 
-        <button onclick="bukaTambahProduk()" class="w-full bg-emerald-600 hover:bg-emerald-500 p-5 rounded-[25px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">
-            + Tambah Produk
-        </button>
+        <div class="grid grid-cols-1 gap-3">
+            <button onclick="bukaKiraCOGS()" class="w-full bg-blue-600 hover:bg-blue-500 p-5 rounded-[25px] font-black uppercase tracking-widest shadow-lg border-b-4 border-blue-800 active:scale-95 transition-all">
+                📊 Kalkulator COGS
+            </button>
+            <button onclick="bukaTambahProduk()" class="w-full bg-emerald-600 hover:bg-emerald-500 p-5 rounded-[25px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">
+                + Tambah Produk
+            </button>
+        </div>
 
         <div id="produkContainer" class="space-y-3">
             </div>
@@ -57,23 +65,17 @@
     <script>
         const SUPABASE_URL = "https://gbjrvrdsmajwajnhsodt.supabase.co";
         const SUPABASE_KEY = "sb_publishable_fp0mnEYNTgc7QexmOP3njg_VK6W6832";
-        
-        // Inisialisasi Supabase Client
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let currentUser = null;
 
-        // 1. PENGURUSAN LOGIN/DAFTAR
+        // 1. AUTH LOGIC
         async function handleAuth(type) {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-            
-            if (!email || !password) {
-                Swal.fire("Info", "Sila masukkan emel dan password", "info");
-                return;
-            }
+            if (!email || !password) return Swal.fire("Info", "Isi emel & password", "info");
 
-            Swal.fire({ title: 'Memproses...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            Swal.fire({ title: 'Sila tunggu...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
             try {
                 const { data, error } = type === 'login' 
@@ -81,13 +83,8 @@
                     : await _supabase.auth.signUp({ email, password });
 
                 if (error) throw error;
-                
-                if (type === 'signup') {
-                    Swal.fire("Berjaya!", "Sila sahkan emel anda (inbox/spam) sebelum login.", "success");
-                } else {
-                    Swal.close();
-                    checkUser();
-                }
+                if (type === 'signup') Swal.fire("Berjaya!", "Sila sahkan emel anda (inbox/spam) sebelum login.", "success");
+                else { Swal.close(); checkUser(); }
             } catch (error) {
                 Swal.fire("Ralat", error.message, "error");
             }
@@ -100,6 +97,8 @@
                 document.getElementById('userLabel').innerText = user.email;
                 document.getElementById('authSection').classList.add('hidden');
                 document.getElementById('dashboardSection').classList.remove('hidden');
+                
+                janaLinkKedai();
                 muatProduk();
             }
         }
@@ -109,7 +108,30 @@
             location.reload();
         }
 
-        // 2. PENGURUSAN PRODUK
+        // 2. STORE LINK LOGIC
+        function janaLinkKedai() {
+            // Menukar admin.html kepada index.html dalam URL semasa
+            const baseUrl = window.location.href.split('admin.html')[0];
+            const fullLink = `${baseUrl}index.html?id=${currentUser.id}`;
+            document.getElementById('storeLinkInput').value = fullLink;
+        }
+
+        function salinLink() {
+            const copyText = document.getElementById("storeLinkInput");
+            copyText.select();
+            copyText.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(copyText.value);
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Disalin!',
+                text: 'Link kedai sedia dikongsi',
+                timer: 1500,
+                showConfirmButton: false
+            });
+        }
+
+        // 3. PRODUCT LOGIC
         async function muatProduk() {
             const { data, error } = await _supabase
                 .from('produk')
@@ -120,9 +142,9 @@
             const container = document.getElementById('produkContainer');
             if (data && data.length > 0) {
                 container.innerHTML = data.map(p => `
-                    <div class="admin-card p-6 relative animate-in fade-in duration-500">
-                        <button onclick="padamProduk(${p.id})" class="absolute top-4 right-4 text-red-500/50 hover:text-red-500 transition-colors text-xl">🗑</button>
-                        <h3 class="font-black text-xl uppercase text-slate-100">${p.nama_barang}</h3>
+                    <div class="admin-card p-6 relative">
+                        <button onclick="padamProduk(${p.id})" class="absolute top-4 right-4 text-red-500/50 hover:text-red-500 text-xl">🗑</button>
+                        <h3 class="font-black text-xl uppercase">${p.nama_barang}</h3>
                         <div class="flex items-end gap-2 mt-2">
                             <span class="text-green-400 font-black text-3xl">${p.stok_kg}kg</span>
                             <span class="text-slate-500 text-xs font-bold mb-1">/ RM${p.harga_kg}</span>
@@ -130,7 +152,7 @@
                     </div>
                 `).join('');
             } else {
-                container.innerHTML = `<div class="text-center py-10 text-slate-500 text-sm font-bold">BELUM ADA PRODUK</div>`;
+                container.innerHTML = `<div class="text-center py-10 text-slate-600 font-bold uppercase text-xs">Belum ada produk</div>`;
             }
         }
 
@@ -139,19 +161,18 @@
                 title: 'TAMBAH PRODUK',
                 html: `
                     <div class="space-y-3">
-                        <input id="n" placeholder="Nama Produk (Cth: Cili)" class="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 text-white">
-                        <input id="h" type="number" placeholder="Harga Jualan / kg (RM)" class="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 text-white">
-                        <input id="s" type="number" placeholder="Stok Semasa (kg)" class="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 text-white">
-                    </div>
-                `,
+                        <input id="n" placeholder="Nama Produk" class="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 text-white">
+                        <input id="h" type="number" placeholder="Harga / kg (RM)" class="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 text-white">
+                        <input id="s" type="number" placeholder="Stok (kg)" class="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 text-white">
+                    </div>`,
                 showCancelButton: true,
                 confirmButtonText: 'SIMPAN',
                 preConfirm: () => {
-                    const nama = document.getElementById('n').value;
-                    const harga = document.getElementById('h').value;
-                    const stok = document.getElementById('s').value;
-                    if(!nama || !harga || !stok) return Swal.showValidationMessage("Sila isi semua kotak");
-                    return { user_id: currentUser.id, nama_barang: nama, harga_kg: harga, stok_kg: stok };
+                    const n = document.getElementById('n').value;
+                    const h = document.getElementById('h').value;
+                    const s = document.getElementById('s').value;
+                    if(!n || !h || !s) return Swal.showValidationMessage("Isi semua kotak!");
+                    return { user_id: currentUser.id, nama_barang: n, harga_kg: h, stok_kg: s };
                 }
             });
 
@@ -164,68 +185,41 @@
 
         async function padamProduk(id) {
             const { isConfirmed } = await Swal.fire({
-                title: 'Padam Produk?',
-                text: "Data ini tidak boleh dikembalikan.",
+                title: 'Padam?',
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonColor: '#ef4444',
-                confirmButtonText: 'YA, PADAM'
+                confirmButtonText: 'YA'
             });
-
             if (isConfirmed) {
                 await _supabase.from('produk').delete().eq('id', id);
                 muatProduk();
             }
         }
 
-        // 3. KALKULATOR COGS
-        function setupCogsInput(id) {
-            const el = document.getElementById(id);
-            if(!el) return;
-            el.addEventListener('focus', function() { if (this.value === "0.00" || this.value === "0") this.value = ""; });
-            el.addEventListener('blur', function() { if (this.value === "") this.value = "0.00"; });
-        }
-
+        // 4. COGS LOGIC
         async function bukaKiraCOGS() {
             const { value: res } = await Swal.fire({
                 title: 'KIRA COGS',
                 html: `
-                    <div class="text-left space-y-3 max-h-[60vh] overflow-y-auto px-2">
+                    <div class="text-left space-y-3 px-2">
                         <div>
-                            <label class="text-[10px] font-black text-slate-500 uppercase">A. Hasil Musim (kg)</label>
-                            <input id="hasil_kg" type="number" class="cogs-input" placeholder="0">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase px-1">Hasil Musim (kg)</label>
+                            <input id="hasil_kg" type="number" class="cogs-input w-full" placeholder="0">
                         </div>
                         <div>
-                            <label class="text-[10px] font-black text-slate-500 uppercase">B. Kos Habis Pakai (RM)</label>
-                            <input id="kos_habis" type="number" class="cogs-input" value="0.00">
+                            <label class="text-[10px] font-bold text-slate-500 uppercase px-1">Kos Operasi (RM)</label>
+                            <input id="kos_op" type="number" class="cogs-input w-full" value="0.00">
                         </div>
-                        <div>
-                            <label class="text-[10px] font-black text-slate-500 uppercase">C. Kos Sistem/Aset (RM)</label>
-                            <input id="kos_aset" type="number" class="cogs-input" value="0.00">
-                        </div>
-                    </div>
-                `,
-                didOpen: () => { ['hasil_kg', 'kos_habis', 'kos_aset'].forEach(setupCogsInput); },
-                confirmButtonText: 'KIRA SEKARANG',
+                    </div>`,
                 preConfirm: () => {
                     const h = parseFloat(document.getElementById('hasil_kg').value) || 1;
-                    const b = parseFloat(document.getElementById('kos_habis').value) || 0;
-                    const a = parseFloat(document.getElementById('kos_aset').value) || 0;
-                    // Formula: (Kos Habis Pakai + Susut Nilai 10%) / Hasil
-                    return (b + (a * 0.1)) / h;
+                    const op = parseFloat(document.getElementById('kos_op').value) || 0;
+                    return op / h;
                 }
             });
-
-            if (res) {
-                Swal.fire({
-                    title: 'HASIL COGS',
-                    html: `<h2 class="text-4xl font-black text-green-400">RM ${res.toFixed(2)} <span class="text-sm text-white">/ kg</span></h2>`,
-                    icon: 'success'
-                });
-            }
+            if (res) Swal.fire("Hasil", `Kos: RM ${res.toFixed(2)} / kg`, "success");
         }
 
-        // Semak status login setiap kali page dilancarkan
         window.onload = checkUser;
     </script>
 </body>
