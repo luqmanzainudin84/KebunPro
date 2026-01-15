@@ -12,8 +12,8 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; color: #1e293b; }
         .card-order { background: white; border-radius: 24px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
         input, select { background: #f1f5f9 !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; padding: 12px !important; font-size: 14px !important; width: 100%; }
-        .btn-submit { background: #10b981; color: white; font-weight: 800; padding: 16px; border-radius: 16px; transition: all 0.2s; }
-        .btn-submit:hover { background: #059669; transform: translateY(-2px); }
+        .btn-submit { background: #10b981; color: white; font-weight: 800; padding: 16px; border-radius: 16px; transition: all 0.2s; width: 100%; }
+        .btn-submit:disabled { background: #94a3b8; cursor: not-allowed; }
         label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 6px; display: block; }
     </style>
 </head>
@@ -22,7 +22,7 @@
     <div class="max-w-md mx-auto space-y-6">
         <div class="text-center py-6">
             <h1 class="text-2xl font-black text-slate-900 uppercase tracking-tight">Kedai Kebun Pro</h1>
-            <p class="text-slate-500 text-sm font-medium">Sila pilih produk & isi maklumat pesanan</p>
+            <p class="text-slate-500 text-sm font-medium">Sila isi borang di bawah untuk memesan</p>
         </div>
 
         <div class="card-order p-6 space-y-5">
@@ -33,7 +33,7 @@
                 </select>
             </div>
 
-            <div id="info_produk" class="hidden grid grid-cols-2 gap-3">
+            <div id="info_produk" class="hidden grid grid-cols-2 gap-3 animate-fade-in">
                 <div class="bg-green-50 p-3 rounded-xl border border-green-100 text-center">
                     <p class="text-[10px] text-green-600 font-bold uppercase">Harga</p>
                     <p id="display_harga" class="text-lg font-black text-green-700">RM 0/KG</p>
@@ -45,14 +45,14 @@
                 <div id="box_lokasi" class="col-span-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
                     <p class="text-[10px] text-slate-500 font-bold uppercase">📍 Lokasi Jualan</p>
                     <p id="display_lokasi" class="text-sm font-bold text-slate-700">--</p>
-                    <a id="link_maps" href="#" target="_blank" class="text-[11px] text-blue-500 font-bold underline mt-1 block hidden">BUKA GOOGLE MAPS 🔗</a>
+                    <a id="link_maps" href="#" target="_blank" class="text-[11px] text-blue-600 font-black underline mt-2 block">BUKA MAPS & ARAH JALAN 🔗</a>
                 </div>
             </div>
 
             <div class="space-y-4 pt-2">
                 <div>
                     <label>Nama Anda</label>
-                    <input type="text" id="nama_pelanggan" placeholder="Nama penuh">
+                    <input type="text" id="nama_pelanggan" placeholder="Masukkan nama penuh">
                 </div>
                 <div>
                     <label>No. Telefon</label>
@@ -64,17 +64,17 @@
                 </div>
             </div>
 
-            <div class="pt-4">
+            <div class="pt-4 border-t border-slate-100">
                 <div class="flex justify-between items-center mb-4 px-1">
-                    <span class="text-sm font-bold text-slate-500">JUMLAH BAYARAN</span>
+                    <span class="text-xs font-bold text-slate-500">ESTIMASI JUMLAH</span>
                     <span id="total_bayar" class="text-2xl font-black text-slate-900">RM 0.00</span>
                 </div>
-                <button onclick="hantarPesanan()" class="w-full btn-submit">HANTAR PESANAN SEKARANG</button>
+                <button id="btnHantar" onclick="hantarPesanan()" class="btn-submit">HANTAR PESANAN SEKARANG</button>
             </div>
         </div>
 
         <div class="space-y-3">
-            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Pesanan Terkini</h3>
+            <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Pesanan Terkini</h3>
             <div id="logContainer" class="space-y-2"></div>
         </div>
     </div>
@@ -89,16 +89,27 @@
         let senaraiProduk = [];
         let produkTerpilih = null;
 
-        async function muatProduk() {
+        async function muatData() {
             if (!farmerId) return;
-            const { data } = await _supabase.from('produk').select('*').eq('user_id', farmerId);
-            if (data) {
-                senaraiProduk = data;
+
+            // 1. Ambil data produk asal
+            const { data: pData } = await _supabase.from('produk').select('*').eq('user_id', farmerId);
+            
+            // 2. Ambil semua pesanan untuk tolak stok
+            const { data: oData } = await _supabase.from('pesanan').select('produk_nama, berat_kg').eq('peladang_id', farmerId);
+
+            if (pData) {
+                senaraiProduk = pData.map(p => {
+                    const terjual = oData ? oData.filter(o => o.produk_nama === p.nama_barang).reduce((s, o) => s + parseFloat(o.berat_kg), 0) : 0;
+                    return { ...p, baki_stok: p.stok_kg - terjual };
+                });
+
                 const select = document.getElementById('pilihan_produk');
-                data.forEach(p => {
+                select.innerHTML = '<option value="">-- Sila Pilih Produk --</option>';
+                senaraiProduk.forEach(p => {
                     const opt = document.createElement('option');
                     opt.value = p.id;
-                    opt.innerText = p.nama_barang;
+                    opt.innerText = `${p.nama_barang} (Baki: ${p.baki_stok.toFixed(1)}kg)`;
                     select.appendChild(opt);
                 });
             }
@@ -113,16 +124,26 @@
             if (produkTerpilih) {
                 infoBox.classList.remove('hidden');
                 document.getElementById('display_harga').innerText = `RM ${produkTerpilih.harga_kg}/KG`;
-                document.getElementById('display_stok').innerText = `${produkTerpilih.stok_kg} KG`;
-                document.getElementById('display_lokasi').innerText = produkTerpilih.lokasi || "Lokasi tidak dinyatakan";
+                
+                const baki = produkTerpilih.baki_stok;
+                const stokEle = document.getElementById('display_stok');
+                stokEle.innerText = `${baki.toFixed(1)} KG`;
+                stokEle.className = baki <= 0 ? "text-lg font-black text-red-600" : "text-lg font-black text-blue-700";
+
+                document.getElementById('display_lokasi').innerText = produkTerpilih.lokasi || "Sila rujuk admin";
                 
                 const linkMaps = document.getElementById('link_maps');
                 if(produkTerpilih.google_maps) {
-                    linkMaps.href = produkTerpilih.google_maps.includes('http') ? produkTerpilih.google_maps : `https://www.google.com/maps?q=${produkTerpilih.google_maps}`;
+                    linkMaps.href = `https://www.google.com/maps/search/?api=1&query=${produkTerpilih.google_maps}`;
                     linkMaps.classList.remove('hidden');
                 } else {
                     linkMaps.classList.add('hidden');
                 }
+
+                // Disable button jika sold out
+                document.getElementById('btnHantar').disabled = baki <= 0;
+                document.getElementById('btnHantar').innerText = baki <= 0 ? "STOK HABIS" : "HANTAR PESANAN SEKARANG";
+
             } else {
                 infoBox.classList.add('hidden');
             }
@@ -138,31 +159,32 @@
         async function hantarPesanan() {
             const nama = document.getElementById('nama_pelanggan').value;
             const tel = document.getElementById('no_tel').value;
-            const berat = document.getElementById('berat_kg').value;
+            const berat = parseFloat(document.getElementById('berat_kg').value);
 
             if (!produkTerpilih || !nama || !tel || !berat) {
-                return Swal.fire("Ralat", "Sila lengkapkan semua maklumat", "error");
+                return Swal.fire("Ralat", "Sila isi semua maklumat", "error");
             }
 
-            const total = parseFloat(produkTerpilih.harga_kg) * parseFloat(berat);
+            if (berat > produkTerpilih.baki_stok) {
+                return Swal.fire("Stok Tidak Cukup", `Baki stok hanya tinggal ${produkTerpilih.baki_stok}kg`, "warning");
+            }
+
+            const total = parseFloat(produkTerpilih.harga_kg) * berat;
 
             const { error } = await _supabase.from('pesanan').insert([{
                 peladang_id: farmerId,
                 nama_pelanggan: nama,
                 no_tel: tel,
                 produk_nama: produkTerpilih.nama_barang,
-                berat_kg: parseFloat(berat),
+                berat_kg: berat,
                 jumlah_harga: total
             }]);
 
             if (error) {
-                console.error(error);
-                Swal.fire("Gagal", "Ralat sistem: " + error.message, "error");
+                Swal.fire("Ralat", error.message, "error");
             } else {
-                Swal.fire("Berjaya", "Pesanan anda telah dihantar!", "success");
-                document.getElementById('berat_kg').value = '';
-                kiraTotal();
-                muatLog();
+                await Swal.fire("Berjaya", "Pesanan anda telah diterima!", "success");
+                location.reload(); 
             }
         }
 
@@ -173,19 +195,19 @@
                 container.innerHTML = data.map(o => `
                     <div class="bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center shadow-sm">
                         <div>
-                            <p class="text-[10px] font-black uppercase text-slate-400 leading-none">${o.produk_nama}</p>
+                            <p class="text-[9px] font-black uppercase text-slate-400 leading-none">${o.produk_nama}</p>
                             <p class="text-sm font-bold text-slate-700">${o.nama_pelanggan}</p>
                         </div>
                         <div class="text-right">
                             <p class="text-sm font-black text-green-600">RM ${o.jumlah_harga.toFixed(2)}</p>
-                            <p class="text-[9px] font-bold text-slate-400 uppercase">${o.status_bayar ? 'Dibayar' : 'Belum Bayar'}</p>
+                            <p class="text-[9px] font-bold text-slate-400 uppercase">${o.status_bayar ? '✅ Dibayar' : '⌛ Pending'}</p>
                         </div>
                     </div>
                 `).join('');
             }
         }
 
-        window.onload = muatProduk;
+        window.onload = muatData;
     </script>
 </body>
 </html>
